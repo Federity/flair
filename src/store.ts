@@ -1,155 +1,126 @@
 import { Database } from "@db/sqlite";
 import { hashFile, spinner } from "../lib/utils.ts";
+import { branches, burns, metrics, weights } from "../lib/schema.ts";
 
-export const setup = () => {
-  const db = new Database(".flair/test.db");
+class Store {
+  path: string;
+  constructor() {
+    this.path = ".flair/store.db";
+  }
+  setup() {
+    const db = new Database(this.path);
 
-  db.prepare(
-    `
-      CREATE TABLE IF NOT EXISTS branches (
-          branch_id INTEGER PRIMARY KEY AUTOINCREMENT,
-          branch_name TEXT UNIQUE NOT NULL,
-          current BOOLEAN NOT NULL DEFAULT 1,
-          created_at DATETIME DEFAULT CURRENT_TIMESTAMP
-      );
-    `
-  ).run();
+    db.prepare(branches).run();
+    db.prepare(burns).run();
+    db.prepare(metrics).run();
+    db.prepare(weights).run();
 
-  db.prepare(
-    `
-      CREATE TABLE IF NOT EXISTS burns (
-          burn_id INTEGER PRIMARY KEY AUTOINCREMENT,
-          burn_hash TEXT UNIQUE NOT NULL,
-          description TEXT,
-          author TEXT DEFAULT SWAGAT, 
-          parent_burn_id INTEGER,
-          branch_id INTEGER NOT NULL,
-          weights_id INTEGER NOT NULL,
-          created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
-          FOREIGN KEY (parent_burn_id) REFERENCES burns(burn_id),
-          FOREIGN KEY (branch_id) REFERENCES branches(branch_id)
-          FOREIGN KEY (weights_id) REFERENCES weights(weights_id)
-      );
-    `
-  ).run();
-
-  // db.prepare(
-  //   `
-  //     CREATE TABLE IF NOT EXISTS metrics (
-  //         metrics_id INTEGER PRIMARY KEY AUTOINCREMENT,
-  //         commit_id INTEGER NOT NULL,
-  //         accuracy REAL,
-  //         loss REAL,
-  //         created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
-  //         FOREIGN KEY (commit_id) REFERENCES commits(commit_id)
-  //     );
-  //   `
-  // ).run();
-
-  db.prepare(
-    `
-    CREATE TABLE IF NOT EXISTS weights (
-      weights_id INTEGER PRIMARY KEY AUTOINCREMENT,
-      weights_hash TEXT NOT NULL,
-      weights_file TEXT NOT NULL, 
-      created_at DATETIME DEFAULT CURRENT_TIMESTAMP
-    );
-    `
-  ).run();
-
-  db.prepare(
-    `
+    db.prepare(
+      `
       INSERT INTO branches (branch_name) VALUES (?);
     `
-  ).run("central");
+    ).run("central");
 
-  db.close();
-};
+    db.close();
+  }
+  getCurrentBranch() {
+    const db = new Database(this.path);
 
-export const getCurrentBranch = () => {
-  const db = new Database(".flair/test.db");
-  return db.sql`SELECT branch_id, branch_name from branches WHERE current = 1`[0];
-};
+    return db.sql`SELECT branch_id, branch_name from branches WHERE current = 1`[0];
+  }
 
-export const createBranch = (name: string) => {
-  const db = new Database(".flair/test.db");
+  createBranch(name: string) {
+    const db = new Database(this.path);
 
-  db.exec(`UPDATE branches
+    db.exec(`UPDATE branches
            SET current = 0
            WHERE current = 1;
   `);
 
-  db.prepare(
-    `
+    db.prepare(
+      `
       INSERT INTO branches (branch_name) VALUES (?);
     `
-  ).run(name);
+    ).run(name);
 
-  db.close();
-};
+    db.close();
+  }
 
-export const getAllBranches = () => {
-  const db = new Database(".flair/test.db");
+  getAllBranches() {
+    const db = new Database(this.path);
 
-  const branches = db.sql`SELECT branch_name from branches`;
-  return branches.map((branch) => branch.branch_name);
-};
+    const branches = db.sql`SELECT branch_name from branches`;
+    return branches.map((branch) => branch.branch_name);
+  }
 
-export const hopBranch = (branch: string) => {
-  const db = new Database(".flair/test.db");
+  hopBranch(branch: string) {
+    const db = new Database(this.path);
 
-  db.exec(`UPDATE branches
+    db.exec(`UPDATE branches
            SET current = 0
            WHERE current = 1;
   `);
 
-  db.prepare(
-    `UPDATE branches
-           SET current = 1
-           WHERE branch_name = ?;
-  `
-  ).run(branch);
-
-  // TODO: Error for non-existing branch
-};
-
-const getWeightSNO = () => {
-  const db = new Database(".flair/test.db");
-  const { weight_id } = db.sql`SELECT COUNT(*) as weight_id FROM weights`[0];
-  return weight_id + 1;
-};
-
-export const burnDB = async (description: string, burnHash: string) => {
-  const db = new Database(".flair/test.db");
-
-  const { branch_id } =
-    db.sql`SELECT branch_id from branches WHERE current = 1`[0];
-
-  const burnIdQuery =
-    db.sql`SELECT burn_id from burns ORDER BY burn_id DESC LIMIT 1`[0];
-  const parentBurnId = burnIdQuery ? burnIdQuery.burn_id : null;
-
-  const weightSNO = getWeightSNO();
-  const weightHash = await hashFile(burnHash);
-
-  spinner.stop();
-  spinner.start("Burning to timeline");
-
-  db.prepare(
+    db.prepare(
+      `UPDATE branches
+     SET current = 1
+     WHERE branch_name = ?;
     `
+    ).run(branch);
+
+    db.close();
+
+    // TODO: Error for non-existing branch
+  }
+
+  getWeightSNO() {
+    const db = new Database(this.path);
+    const { weight_id } = db.sql`SELECT COUNT(*) as weight_id FROM weights`[0];
+    return weight_id + 1;
+  }
+
+  async burnStore(description: string, burnHash: string, metrics: string) {
+    const db = new Database(this.path);
+
+    const { branch_id } =
+      db.sql`SELECT branch_id from branches WHERE current = 1`[0];
+
+    const burnIdQuery =
+      db.sql`SELECT burn_id from burns ORDER BY burn_id DESC LIMIT 1`[0];
+    const parentBurnId = burnIdQuery ? burnIdQuery.burn_id : null;
+
+    const weightSNO = await this.getWeightSNO();
+    const weightHash = await hashFile(burnHash);
+
+    spinner.stop();
+    spinner.start("Burning to timeline");
+
+    db.prepare(
+      `
       INSERT INTO weights (weights_hash, weights_file) VALUES (?, ?);
     `
-  ).run(weightHash, `./flair/weights/${burnHash}.pth`);
+    ).run(weightHash, `.flair/weights/${burnHash}.pth`);
 
-  db.prepare(
-    `
+    db.prepare(
+      `
       INSERT INTO burns (burn_hash, description, parent_burn_id, branch_id, weights_id) VALUES (?, ?, ?, ?, ?);
     `
-  ).run(burnHash, description, parentBurnId, branch_id, weightSNO);
-};
+    ).run(burnHash, description, parentBurnId, branch_id, weightSNO);
 
-export const getAllBurns = () => {
-  const db = new Database(".flair/test.db");
-  const { branch_id } = getCurrentBranch();
-  return db.sql`SELECT burn_hash, description, author, branch_id, created_at from burns WHERE branch_id = ${branch_id}`;
-};
+    db.prepare(
+      `
+      INSERT INTO metrics (burn_hash, architecture) VALUES (?, ?);
+    `
+    ).run(burnHash, metrics);
+  }
+
+  getAllBurns() {
+    const db = new Database(this.path);
+    const { branch_id } = this.getCurrentBranch();
+    return db.sql`SELECT burn_hash, description, author, branch_id, created_at from burns WHERE branch_id = ${branch_id}`;
+  }
+}
+
+const store = new Store();
+
+export default store;

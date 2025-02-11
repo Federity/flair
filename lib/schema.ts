@@ -1,0 +1,42 @@
+export const branches = `
+      CREATE TABLE IF NOT EXISTS branches (
+          branch_id INTEGER PRIMARY KEY AUTOINCREMENT,
+          branch_name TEXT UNIQUE NOT NULL,
+          current BOOLEAN NOT NULL DEFAULT 1,
+          created_at DATETIME DEFAULT CURRENT_TIMESTAMP
+      );
+    `;
+export const burns = `
+      CREATE TABLE IF NOT EXISTS burns (
+          burn_id INTEGER PRIMARY KEY AUTOINCREMENT,
+          burn_hash TEXT UNIQUE NOT NULL,
+          description TEXT,
+          author TEXT DEFAULT SWAGAT, 
+          parent_burn_id INTEGER,
+          branch_id INTEGER NOT NULL,
+          weights_id INTEGER NOT NULL,
+          created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+          FOREIGN KEY (parent_burn_id) REFERENCES burns(burn_id),
+          FOREIGN KEY (branch_id) REFERENCES branches(branch_id)
+          FOREIGN KEY (weights_id) REFERENCES weights(weights_id)
+      );
+    `;
+export const metrics = `
+        CREATE TABLE IF NOT EXISTS metrics (
+            metrics_id INTEGER PRIMARY KEY AUTOINCREMENT,
+            burn_hash TEXT UNIQUE NOT NULL,
+            architecture TEXT NOT NULL,
+            accuracy REAL,
+            loss REAL,
+            created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+            FOREIGN KEY (burn_hash) REFERENCES burns(burn_hash)
+        );
+      `;
+export const weights = `
+    CREATE TABLE IF NOT EXISTS weights (
+      weights_id INTEGER PRIMARY KEY AUTOINCREMENT,
+      weights_hash TEXT NOT NULL,
+      weights_file TEXT NOT NULL, 
+      created_at DATETIME DEFAULT CURRENT_TIMESTAMP
+    );
+    `;
