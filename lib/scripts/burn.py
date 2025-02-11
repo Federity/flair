@@ -1,4 +1,4 @@
-# !! This script is not an executable python file! 
+# !! This is not an executable python file! 
 
 import torch
 from {modulePath} import {model}

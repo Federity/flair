@@ -4,8 +4,4 @@ export type burnOptions = {
   description: string | true;
 };
 
-// export type loadOptions = {
-//   file: string | true;
-//   model: string | true;
-//   weightHash: string | true;
-// };
+export type mergeOptions = { branch: string | true };

@@ -56,12 +56,13 @@ class Spinner {
 export const spinner = new Spinner();
 
 export const bruteFlairSearch = async (
-  level: number,
-  target: string
+  target: string = "",
+  level: number = 0
 ): Promise<string> => {
   const standard = ".flair/" + target;
-  if (level > 15) {
+  if (level > 12) {
     console.log("Directory nesting goes brr...");
+    console.log("/.flair not found");
     Deno.exit(0);
   }
   try {
@@ -76,7 +77,7 @@ export const bruteFlairSearch = async (
   } catch (error) {
     if (error instanceof Deno.errors.NotFound) {
       Deno.chdir("../");
-      return await bruteFlairSearch(level + 1, target);
+      return await bruteFlairSearch(target, level + 1);
     } else {
       console.error("Error:", error);
     }

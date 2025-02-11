@@ -2,7 +2,7 @@
 
 import { Command } from "@cliffy/command";
 import store from "./store.ts";
-import { burnOptions } from "../lib/types.ts";
+import { burnOptions, mergeOptions } from "../lib/types.ts";
 import flair from "./function.ts";
 import { bruteFlairSearch } from "../lib/utils.ts";
 
@@ -23,7 +23,8 @@ program
   .command("branch")
   .option("-l, --list", "list all available branches", {
     standalone: true,
-    action: () => {
+    action: async () => {
+      await bruteFlairSearch();
       const branches = store.getAllBranches();
       for (const branch of branches) {
         const { branch_name } = store.getCurrentBranch();
@@ -33,13 +34,15 @@ program
       }
     },
   })
-  .action(() => {
+  .action(async () => {
+    await bruteFlairSearch();
     const { branch_name } = store.getCurrentBranch();
     console.log(`current: ${branch_name}`);
   })
   .command("create")
   .arguments("<name>")
-  .action((_: void, branch: string) => {
+  .action(async (_: void, branch: string) => {
+    await bruteFlairSearch();
     store.createBranch(branch);
     console.log("new branch created");
     const { branch_name } = store.getCurrentBranch();
@@ -47,15 +50,20 @@ program
   })
   .command("hop")
   .arguments("<name>")
-  .action((_: void, branch: string) => {
+  .action(async (_: void, branch: string) => {
+    await bruteFlairSearch();
     store.hopBranch(branch);
     const { branch_name } = store.getCurrentBranch();
     console.log(`current: ${branch_name}`);
   })
   .command("burn", "")
-  .option("-p, --path [type:string]", "Path to module containing model", {
-    required: true,
-  })
+  .option(
+    "-p, --path [type:string]",
+    "Absolute path to module containing model with respect to .flair",
+    {
+      required: true,
+    }
+  )
   .option("-m, --model [type:string]", "Name of model instance", {
     required: true,
   })
@@ -63,24 +71,35 @@ program
     required: true,
   })
   .group("The required flags to pass while burning")
-  .action((options: burnOptions, _: void) => flair.burnWeights(options))
-  .command("timeline", "")
-  .action(() => {
-    // const burns = store.getAllBurns().reverse();
-    // console.log`\nBurn Timeline on branch: ${
-    //   store.getCurrentBranch().branch_name
-    // }\n`();
-    // for (let i = 0; i < burns.length; i++) {
-    //   console.log(
-    //     `${burns[i].burn_hash} -- ${burns[i].author} -- ${burns[i].created_at}\n ${burns[i].description}` +
-    //       `${i < burns.length - 1 ? "\n\n^\n|\n" : ""}`
-    //   );
-    // }
+  .action(async (options: burnOptions, _: void) => {
+    await bruteFlairSearch();
+    flair.burnWeights(options);
   })
-  .command("wipe")
+  .command("timeline", "Displays history of burns on current branch")
+  .action(() => {
+    const burns = store.getAllBurns().reverse();
+    console.log(
+      `\nBurn timeline on branch: ${store.getCurrentBranch().branch_name}\n`
+    );
+    for (let i = 0; i < burns.length; i++) {
+      console.log(
+        `${burns[i].burn_hash} -- ${burns[i].author} -- ${burns[i].created_at}\n ${burns[i].description}` +
+          `${i < burns.length - 1 ? "\n\n^\n|\n" : ""}`
+      );
+    }
+  })
+  .command("wipe", "Wipes all traces of flair")
   .action(async () => {
-    await bruteFlairSearch(0, "");
+    await bruteFlairSearch();
     await Deno.remove(".flair", { recursive: true });
+  })
+  .command("merge")
+  .option("-b, --branch [type:string]", "Branch to merge on", {
+    required: true,
+  })
+  .action(async (options: mergeOptions, _: void) => {
+    await bruteFlairSearch();
+    flair.merge(options);
   })
   .command("rollback")
   .action(() => {})

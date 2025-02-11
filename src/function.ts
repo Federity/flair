@@ -1,5 +1,5 @@
 import store from "./store.ts";
-import { burnOptions } from "../lib/types.ts";
+import { burnOptions, mergeOptions } from "../lib/types.ts";
 import { generateRandomHash, sanitizePythonPath } from "../lib/utils.ts";
 import { spinner } from "../lib/utils.ts";
 import { bruteFlairSearch } from "../lib/utils.ts";
@@ -51,7 +51,7 @@ class Flair {
   burnWeights = async ({ path, model, description }: burnOptions) => {
     try {
       const hash = generateRandomHash();
-      await bruteFlairSearch(0, `weights/${hash}.pth`);
+      await bruteFlairSearch(`weights/${hash}.pth`);
       const weightPath = ".flair/weights/" + hash + ".pth";
       const modulePath = sanitizePythonPath(path as string);
       const burnScript = await Deno.open("burn.py", {
@@ -87,6 +87,7 @@ class Flair {
       Deno.exit(0);
     }
   };
+  merge = async ({ branch }: mergeOptions) => {};
 }
 
 const flair = new Flair();
