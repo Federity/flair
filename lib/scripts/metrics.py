@@ -1,7 +1,7 @@
 # !! This is not an executable python file! 
 
 import torch.nn as nn
-from {modulePath} import {model}
+from {modulePath} import {model_instance}
 class ModelCapture:
 	def __init__(self, model):
 		self.model=model
@@ -22,5 +22,5 @@ class ModelCapture:
 					layer_info["role"]="GAN Component"
 				architecture.append(layer_info)
 		print(architecture)
-meta=ModelCapture(model)
+meta=ModelCapture({model_instance})
 meta.get_architecture()
