@@ -12,12 +12,11 @@ export const burns = `
           burn_hash TEXT UNIQUE NOT NULL,
           description TEXT,
           author TEXT DEFAULT SWAGAT, 
-          parent_burn_id INTEGER,
+          parent_burn_hash TEXT,
           branch_id INTEGER NOT NULL,
           weights_id INTEGER NOT NULL,
           created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
-          FOREIGN KEY (parent_burn_id) REFERENCES burns(burn_id),
-          FOREIGN KEY (branch_id) REFERENCES branches(branch_id)
+          FOREIGN KEY (branch_id) REFERENCES branches(branch_id),
           FOREIGN KEY (weights_id) REFERENCES weights(weights_id)
       );
     `;
@@ -40,3 +39,10 @@ export const weights = `
       created_at DATETIME DEFAULT CURRENT_TIMESTAMP
     );
     `;
+export const misc = `
+    CREATE TABLE IF NOT EXISTS misc (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      module_path TEXT NOT NULL,
+      model_instance TEXT NOT NULL 
+    );
+`;

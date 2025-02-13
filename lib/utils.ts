@@ -14,14 +14,6 @@ export const sanitizePythonPath = (path: string) => {
   else if (path.startsWith("/")) path = path.slice(1);
   if (path.endsWith(".py")) path = path.slice(0, path.length - 3);
   return path.replaceAll("/", ".").replaceAll("\\", ".");
-  // return path
-  //   .replace(/^((?:\.\.\/)+)/, (match) => {
-  //     const count = (match.match(/\.\.\//g) || []).length;
-  //     return ".".repeat(count + 1);
-  //   })
-  //   .replace(/^(?:\.\/|\/)/, "")
-  //   .replace(/\//g, ".")
-  //   .replace(/\.py$/, "");
 };
 
 const frames = ["●   ", " ●  ", "  ● ", "   ●", "  ● ", " ●  "];
@@ -55,11 +47,7 @@ class Spinner {
 
 export const spinner = new Spinner();
 
-export const bruteFlairSearch = async (
-  target: string = "",
-  level: number = 0
-): Promise<string> => {
-  const standard = ".flair/" + target;
+export const bruteFlairSearch = async (level: number = 0) => {
   if (level > 12) {
     console.log("Directory nesting goes brr...");
     console.log("/.flair not found");
@@ -67,20 +55,13 @@ export const bruteFlairSearch = async (
   }
   try {
     const fileInfo = await Deno.stat(".flair");
-    if (fileInfo.isDirectory) {
-      let prefix = "";
-      for (let i = 0; i < level; i++) {
-        prefix += "../";
-      }
-      return prefix + standard;
-    }
+    if (fileInfo.isDirectory) return;
   } catch (error) {
     if (error instanceof Deno.errors.NotFound) {
       Deno.chdir("../");
-      return await bruteFlairSearch(target, level + 1);
+      await bruteFlairSearch(level + 1);
     } else {
       console.error("Error:", error);
     }
   }
-  return "";
 };

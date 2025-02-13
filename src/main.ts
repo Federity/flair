@@ -2,11 +2,17 @@
 
 import { Command } from "@cliffy/command";
 import store from "./store.ts";
-import { burnOptions, mergeOptions } from "../lib/types.ts";
+import { burnOptions, meltOptions } from "../lib/types.ts";
 import flair from "./function.ts";
-import { bruteFlairSearch } from "../lib/utils.ts";
+import { bruteFlairSearch, sanitizePythonPath } from "../lib/utils.ts";
 
 const program = new Command();
+const abort = async () => {
+  console.log("\nProcess aborted");
+  await Deno.remove("burn.py");
+  await Deno.remove("metrics.py");
+  Deno.exit(0);
+};
 
 program
   .name("flair")
@@ -20,8 +26,8 @@ program
   .action(() => console.log("Version control for federity"))
   .command("up")
   .action(() => flair.initialize())
-  .command("branch")
-  .option("-l, --list", "list all available branches", {
+  .command("branch", "Displays current working branch")
+  .option("-l, --list", "List all available branches", {
     standalone: true,
     action: async () => {
       await bruteFlairSearch();
@@ -37,35 +43,40 @@ program
   .action(async () => {
     await bruteFlairSearch();
     const { branch_name } = store.getCurrentBranch();
-    console.log(`current: ${branch_name}`);
+    console.log(`Current: ${branch_name}`);
   })
-  .command("create")
+  .command("create", "Creates a new branch")
   .arguments("<name>")
   .action(async (_: void, branch: string) => {
     await bruteFlairSearch();
     store.createBranch(branch);
-    console.log("new branch created");
+    console.log("New branch created");
     const { branch_name } = store.getCurrentBranch();
-    console.log(`current: ${branch_name}`);
+    console.log(`Current: ${branch_name}`);
   })
-  .command("hop")
+  .command("hop", "Switches to another branch")
   .arguments("<name>")
   .action(async (_: void, branch: string) => {
     await bruteFlairSearch();
     store.hopBranch(branch);
     const { branch_name } = store.getCurrentBranch();
-    console.log(`current: ${branch_name}`);
+    console.log(`Current: ${branch_name}`);
   })
   .command("burn", "")
   .option(
     "-p, --path [type:string]",
-    "Absolute path to module containing model with respect to .flair",
-    {
-      required: true,
-    }
+    "Absolute path to module containing model with respect to .flair"
   )
-  .option("-m, --model [type:string]", "Name of model instance", {
-    required: true,
+  .option("-m, --model [type:string]", "Name of model instance")
+  .option("-s, --set", "", {
+    default: true,
+    conflicts: ["description"],
+    action: async (args) => {
+      await bruteFlairSearch();
+      args.path = sanitizePythonPath(args.path as string);
+      store.saveMisc(args);
+      Deno.exit(0);
+    },
   })
   .option("-d, --description [type:string]", "Description", {
     required: true,
@@ -76,16 +87,30 @@ program
     flair.burnWeights(options);
   })
   .command("timeline", "Displays history of burns on current branch")
-  .action(() => {
+  .action(async () => {
+    await bruteFlairSearch();
     const burns = store.getAllBurns().reverse();
     console.log(
       `\nBurn timeline on branch: ${store.getCurrentBranch().branch_name}\n`
     );
     for (let i = 0; i < burns.length; i++) {
+      let parentHash = [];
+      const a = burns[i].description.split(" ");
+      const base = a[1];
+      const melt = a[3];
+
+      if (burns[i].parent_burn_hash && burns[i].parent_burn_hash.length > 32) {
+        parentHash = burns[i].parent_burn_hash.split(";");
+      }
       console.log(
-        `${burns[i].burn_hash} -- ${burns[i].author} -- ${burns[i].created_at}\n ${burns[i].description}` +
-          `${i < burns.length - 1 ? "\n\n^\n|\n" : ""}`
+        `${burns[i].burn_hash} -- ${burns[i].author} -- ${burns[i].created_at}`
       );
+      console.log(`  ${burns[i].description}`);
+      if (parentHash.length)
+        console.log(
+          `\n\t${parentHash[0]}: ${base}` + `\n\t${parentHash[1]}: ${melt}`
+        );
+      console.log(`${i < burns.length - 1 ? "\n^\n|\n" : ""}`);
     }
   })
   .command("wipe", "Wipes all traces of flair")
@@ -93,16 +118,19 @@ program
     await bruteFlairSearch();
     await Deno.remove(".flair", { recursive: true });
   })
-  .command("merge")
-  .option("-b, --branch [type:string]", "Branch to merge on", {
+  .command("melt")
+  .option("-b, --branch [type:string]", "Branch to melt on", {
     required: true,
   })
-  .action(async (options: mergeOptions, _: void) => {
+  .action(async (options: meltOptions, _: void) => {
     await bruteFlairSearch();
-    flair.merge(options);
+    flair.melt(options);
   })
-  .command("rollback")
-  .action(() => {})
-  .command("fetch")
-  .action(() => {})
+  // .command("rollback")
+  // .action(() => {})
+  // .command("fetch")
+  // .action(() => {})
   .parse(Deno.args);
+
+// Deno.addSignalListener("SIGTERM", abort); // unavailable on windows
+Deno.addSignalListener("SIGINT", abort);
